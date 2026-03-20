@@ -1,0 +1,11 @@
+{
+  "name": "chmurowe",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently -n api,ui -c blue,magenta \"npm run dev --prefix backend\" \"npm run dev --prefix frontend\"",
+    "import": "npm run import --prefix backend"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}
