@@ -1,0 +1,69 @@
+---
+# PostgreSQL — dostęp z sieci prywatnej dla backendu (bez forwardu portu na hosta).
+- name: Provisioning bazy danych (db)
+  hosts: all
+  become: true
+
+  vars:
+    pg_version_cmd: "ls -1 /etc/postgresql 2>/dev/null | head -n1"
+
+  tasks:
+    - name: Apt update
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Instalacja PostgreSQL
+      ansible.builtin.apt:
+        name: postgresql
+        state: present
+
+    - name: Odczyt wersji katalogu konfiguracji PG
+      ansible.builtin.shell: set -eo pipefail; {{ pg_version_cmd }}
+      args:
+        executable: /bin/bash
+      register: pg_ver_dir
+      changed_when: false
+
+    - name: Ścieżki konfiguracji
+      ansible.builtin.set_fact:
+        pg_conf_dir: "/etc/postgresql/{{ pg_ver_dir.stdout | trim }}/main"
+        pg_conf: "/etc/postgresql/{{ pg_ver_dir.stdout | trim }}/main/postgresql.conf"
+        pg_hba: "/etc/postgresql/{{ pg_ver_dir.stdout | trim }}/main/pg_hba.conf"
+
+    - name: Nasłuch na wszystkich interfejsach (sieć prywatna)
+      ansible.builtin.lineinfile:
+        path: "{{ pg_conf }}"
+        regexp: "^#?listen_addresses\\s*="
+        line: "listen_addresses = '*'"
+      notify: Restart postgresql
+
+    - name: pg_hba — dostęp z podsieci prywatnej
+      ansible.builtin.lineinfile:
+        path: "{{ pg_hba }}"
+        line: "host    all    all    {{ private_subnet_cidr }}    scram-sha-256"
+        create: false
+      notify: Restart postgresql
+
+    - name: Flush handlers (restart przed create user)
+      ansible.builtin.meta: flush_handlers
+
+    - name: Rola i baza aplikacji
+      ansible.builtin.shell: |
+        set -euo pipefail
+        psql -tc "SELECT 1 FROM pg_roles WHERE rolname='{{ postgres_user }}'" | grep -q 1 \
+          || psql -c "CREATE ROLE {{ postgres_user }} WITH LOGIN PASSWORD '{{ postgres_password }}';"
+        psql -tc "SELECT 1 FROM pg_database WHERE datname='{{ postgres_db }}'" | grep -q 1 \
+          || psql -c "CREATE DATABASE {{ postgres_db }} OWNER {{ postgres_user }};"
+      become_user: postgres
+      register: db_init
+      changed_when: >-
+        'CREATE ROLE' in (db_init.stdout | default('') ~ db_init.stderr | default(''))
+        or 'CREATE DATABASE' in (db_init.stdout | default('') ~ db_init.stderr | default(''))
+      failed_when: db_init.rc != 0
+
+  handlers:
+    - name: Restart postgresql
+      ansible.builtin.service:
+        name: postgresql
+        state: restarted

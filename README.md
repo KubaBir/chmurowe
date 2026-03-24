@@ -4,8 +4,8 @@ Monorepo na potrzeby zajęć: baza **PostgreSQL**, backend **Express** (REST), f
 
 ## Wymagania
 
-- [Docker](https://www.docker.com/) (PostgreSQL w kontenerze)
-- Node.js 20+ i npm
+- [Docker](https://www.docker.com/) (PostgreSQL w kontenerze) **albo** środowisko z sekcji [Wirtualizacja (Vagrant)](#wirtualizacja-vagrant)
+- Node.js 20+ i npm (lokalnie; w VM instaluje Ansible)
 
 ## Konfiguracja
 
@@ -69,6 +69,8 @@ npm run dev
 - [`backend/`](backend/) — Express, skrypt importu `scripts/import.mjs`
 - [`frontend/`](frontend/) — Vite + React + Tailwind
 - [`archive/`](archive/) — źródłowe pliki CSV (Kaggle)
+- [`Vagrantfile`](Vagrantfile) — trzy VM: `db`, `backend`, `frontend` (sieć prywatna + forward tylko Vite)
+- [`ansible/playbooks/`](ansible/playbooks/) — provisioning wyłącznie Ansible (bez `shell` provisionera Vagranta)
 
 ## Produkcja
 
@@ -77,3 +79,63 @@ cd frontend && npm run build
 ```
 
 Statyczne pliki w `frontend/dist/` — do hostowania za reverse proxy lub CDN; backend uruchamiaj przez `npm start` w `backend/` z ustawionym `DATABASE_URL`.
+
+## Wirtualizacja (Vagrant)
+
+Etap 5.0: trzy maszyny **`db`**, **`backend`**, **`frontend`** w sieci prywatnej VirtualBox (`192.168.56.0/24`). **Tylko `frontend`** ma `forwarded_port` (Vite `5173 → 127.0.0.1:5173` na hoście). PostgreSQL i API są dostępne wyłącznie z sieci prywatnej; przeglądarka na hoście łączy się z API pod adresem **`http://192.168.56.11:3000`** (routing VirtualBox do gościa).
+
+### Wymagania na hoście
+
+- [VirtualBox](https://www.virtualbox.org/)
+- [Vagrant](https://www.vagrantup.com/)
+- [Ansible](https://docs.ansible.com/ansible/latest/installation_guide/intro_installation.html) na maszynie, z której uruchamiasz `vagrant` (Linux/macOS lub [WSL](https://docs.ansible.com/ansible/latest/installation_guide/intro_installation.html#installing-ansible-on-windows) na Windows — provisioner `ansible` uruchamia playbook na hoście i łączy się po SSH z gośćmi)
+
+### Uruchomienie
+
+Z katalogu głównego repozytorium (katalog montowany w gościach jako `/vagrant`):
+
+```bash
+vagrant up
+```
+
+Kolejność definicji VM: `db` → `backend` → `frontend`. Po starcie:
+
+- UI: [http://localhost:5173](http://localhost:5173) (jedyny forward portu)
+- API (z hosta): `http://192.168.56.11:3000` (np. `curl http://192.168.56.11:3000/songs`)
+
+SSH:
+
+```bash
+vagrant ssh db
+vagrant ssh backend
+vagrant ssh frontend
+```
+
+Ponowne zastosowanie Ansible:
+
+```bash
+vagrant provision
+# lub pojedynczo:
+vagrant provision db
+```
+
+### Co robi Ansible
+
+| Maszyna   | Playbook | Zawartość |
+|-----------|----------|-----------|
+| `db`      | [`ansible/playbooks/db.yml`](ansible/playbooks/db.yml) | PostgreSQL, `listen_addresses`, `pg_hba` dla podsieci, użytkownik i baza |
+| `backend` | [`ansible/playbooks/backend.yml`](ansible/playbooks/backend.yml) | Node 20, `npm install`, `.env` z `DATABASE_URL` na IP bazy, `npm run import`, usługa systemd `chmurowe-backend` |
+| `frontend`| [`ansible/playbooks/frontend.yml`](ansible/playbooks/frontend.yml) | Node 20, `.env` z `VITE_API_URL` na IP backendu, `npm install`, usługa systemd `chmurowe-frontend` (Vite `--host 0.0.0.0`) |
+
+Szablony Jinja: [`ansible/templates/`](ansible/templates/). Adresy IP i hasła można zmienić w [`Vagrantfile`](Vagrantfile) (`ANSIBLE_VARS`).
+
+### Windows bez Ansible na hoście
+
+Domyślnie użyty jest provisioner `ansible` (playbook na hoście). Jeśli nie chcesz instalować Ansible w WSL, możesz w `Vagrantfile` zamienić `ansible` na `ansible_local` i dodać `ansible.install = true` — playbook wykona się na danej VM względem `localhost` (wymaga osobnej adaptacji playbooków pod `ansible_local`).
+
+### Zatrzymanie / sprzątanie
+
+```bash
+vagrant halt
+vagrant destroy
+```

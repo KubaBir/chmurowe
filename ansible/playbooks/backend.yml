@@ -1,0 +1,94 @@
+---
+- name: Provisioning backendu (Node + Express)
+  hosts: all
+  become: true
+
+  tasks:
+    - name: Apt update
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Narzędzia (curl, git, build)
+      ansible.builtin.apt:
+        name:
+          - ca-certificates
+          - curl
+          - git
+          - build-essential
+        state: present
+
+    - name: NodeSource setup 20.x
+      ansible.builtin.shell: |
+        set -euo pipefail
+        curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+      args:
+        creates: /etc/apt/sources.list.d/nodesource.list
+      changed_when: true
+
+    - name: Instalacja Node.js 20
+      ansible.builtin.apt:
+        name: nodejs
+        state: present
+        update_cache: true
+
+    - name: Czekam na PostgreSQL na maszynie db
+      ansible.builtin.wait_for:
+        host: "{{ db_private_ip }}"
+        port: 5432
+        delay: 2
+        timeout: 120
+
+    - name: Zależności npm (backend)
+      ansible.builtin.command: npm install
+      args:
+        chdir: /vagrant/backend
+      become: true
+      become_user: vagrant
+      register: npm_backend
+      changed_when: true
+
+    - name: Szablon .env backendu (sieć prywatna)
+      ansible.builtin.template:
+        src: "{{ (playbook_dir | dirname) }}/templates/backend.env.j2"
+        dest: /vagrant/backend/.env
+        owner: vagrant
+        group: vagrant
+        mode: "0640"
+
+    - name: Import danych z CSV do PostgreSQL
+      ansible.builtin.command: npm run import
+      args:
+        chdir: /vagrant/backend
+      environment:
+        DATABASE_URL: "postgresql://{{ postgres_user }}:{{ postgres_password }}@{{ db_private_ip }}:5432/{{ postgres_db }}"
+      become: true
+      become_user: vagrant
+      register: import_run
+      changed_when: true
+
+    - name: Jednostka systemd — API Express
+      ansible.builtin.template:
+        src: "{{ (playbook_dir | dirname) }}/templates/chmurowe-backend.service.j2"
+        dest: /etc/systemd/system/chmurowe-backend.service
+        mode: "0644"
+      notify:
+        - Reload systemd
+        - Restart chmurowe-backend
+
+    - name: Włączenie i start API
+      ansible.builtin.systemd:
+        name: chmurowe-backend
+        enabled: true
+        state: started
+        daemon_reload: true
+
+  handlers:
+    - name: Reload systemd
+      ansible.builtin.systemd:
+        daemon_reload: true
+
+    - name: Restart chmurowe-backend
+      ansible.builtin.systemd:
+        name: chmurowe-backend
+        state: restarted

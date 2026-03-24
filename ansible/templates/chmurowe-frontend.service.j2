@@ -1,0 +1,17 @@
+[Unit]
+Description=Chmurowe Vite (frontend)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=vagrant
+Group=vagrant
+WorkingDirectory=/vagrant/frontend
+# Tylko forwarded_port z VM na hosta — serwer musi słuchać na wszystkich interfejsach
+ExecStart=/usr/bin/npm run dev -- --host 0.0.0.0 --port 5173
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
