@@ -1,14 +1,34 @@
 services:
-  postgres:
+  db:
     image: postgres:16-alpine
-    ports:
-      - "5432:5432"
     environment:
       POSTGRES_USER: spotify
       POSTGRES_PASSWORD: spotify
       POSTGRES_DB: spotify_db
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+
+  backend:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgresql://spotify:spotify@db:5432/spotify_db
+      PORT: 8080
+    depends_on:
+      - db
+    volumes:
+      - ./backend:/app
+      - ./db:/app/db:ro
+      - ./archive:/app/archive:ro
+      - /app/node_modules
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
 
 volumes:
-  pgdata:
+  postgres_data:
+
