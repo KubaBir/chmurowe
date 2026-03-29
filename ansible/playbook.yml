@@ -1,0 +1,242 @@
+- hosts: all
+  become: true
+  vars:
+    project_root: /vagrant
+    db_name: spotify_db
+    db_user: spotify
+    db_password: spotify
+
+  handlers:
+    - name: restart postgresql
+      ansible.builtin.service:
+        name: postgresql
+        state: restarted
+
+    - name: restart backend service
+      ansible.builtin.systemd:
+        name: chmurowe-backend
+        state: restarted
+
+    - name: restart nginx
+      ansible.builtin.service:
+        name: nginx
+        state: restarted
+
+  tasks:
+    - name: Install common apt dependencies
+      ansible.builtin.apt:
+        name:
+          - curl
+          - ca-certificates
+          - gnupg
+        state: present
+        update_cache: true
+
+    - name: Install PostgreSQL packages
+      ansible.builtin.apt:
+        name:
+          - postgresql
+          - postgresql-contrib
+        state: present
+      when: node_role == "db"
+
+    - name: Ensure PostgreSQL service is enabled and started
+      ansible.builtin.service:
+        name: postgresql
+        enabled: true
+        state: started
+      when: node_role == "db"
+
+    - name: Allow PostgreSQL remote listen addresses
+      ansible.builtin.lineinfile:
+        path: /etc/postgresql/14/main/postgresql.conf
+        regexp: "^#?listen_addresses\\s*="
+        line: "listen_addresses = '*'"
+      when: node_role == "db"
+      notify: restart postgresql
+
+    - name: Allow private network connections in pg_hba.conf
+      ansible.builtin.lineinfile:
+        path: /etc/postgresql/14/main/pg_hba.conf
+        line: "host    all             all             192.168.56.0/24          scram-sha-256"
+        insertafter: EOF
+      when: node_role == "db"
+      notify: restart postgresql
+
+    - name: Ensure PostgreSQL is restarted after network config
+      ansible.builtin.service:
+        name: postgresql
+        state: restarted
+      when: node_role == "db"
+
+    - name: Check if DB role exists
+      ansible.builtin.command: runuser -u postgres -- psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='{{ db_user }}'"
+      register: db_role_exists
+      changed_when: false
+      when: node_role == "db"
+
+    - name: Create DB role if missing
+      ansible.builtin.command: runuser -u postgres -- psql -c "CREATE ROLE {{ db_user }} LOGIN PASSWORD '{{ db_password }}'"
+      when:
+        - node_role == "db"
+        - db_role_exists.stdout | trim != "1"
+
+    - name: Check if database exists
+      ansible.builtin.command: runuser -u postgres -- psql -tAc "SELECT 1 FROM pg_database WHERE datname='{{ db_name }}'"
+      register: db_exists
+      changed_when: false
+      when: node_role == "db"
+
+    - name: Create database if missing
+      ansible.builtin.command: runuser -u postgres -- psql -c "CREATE DATABASE {{ db_name }} OWNER {{ db_user }}"
+      when:
+        - node_role == "db"
+        - db_exists.stdout | trim != "1"
+
+    - name: Install Node.js prerequisites
+      ansible.builtin.apt:
+        name:
+          - python3
+          - python3-pip
+        state: present
+      when: node_role in ["backend", "frontend"]
+
+    - name: Add NodeSource apt repository
+      ansible.builtin.shell: |
+        set -euo pipefail
+        curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+      args:
+        executable: /bin/bash
+        creates: /etc/apt/sources.list.d/nodesource.list
+      when: node_role in ["backend", "frontend"]
+
+    - name: Install Node.js
+      ansible.builtin.apt:
+        name: nodejs
+        state: present
+        update_cache: true
+      when: node_role in ["backend", "frontend"]
+
+    - name: Create backend .env
+      ansible.builtin.copy:
+        dest: "{{ project_root }}/backend/.env"
+        mode: "0644"
+        content: |
+          DATABASE_URL=postgresql://{{ db_user }}:{{ db_password }}@{{ db_host }}:5432/{{ db_name }}
+          PORT=8080
+      when: node_role == "backend"
+
+    - name: Install backend dependencies
+      ansible.builtin.command: npm install
+      args:
+        chdir: "{{ project_root }}/backend"
+      when: node_role == "backend"
+
+    - name: Ensure backend state directory exists
+      ansible.builtin.file:
+        path: /var/lib/chmurowe
+        state: directory
+        mode: "0755"
+      when: node_role == "backend"
+
+    - name: Check if backend import was already done
+      ansible.builtin.stat:
+        path: /var/lib/chmurowe/backend_import_done
+      register: backend_import_marker
+      when: node_role == "backend"
+
+    - name: Wait for PostgreSQL to be reachable
+      ansible.builtin.wait_for:
+        host: "{{ db_host }}"
+        port: 5432
+        timeout: 180
+      when: node_role == "backend"
+
+    - name: Import seed data into PostgreSQL
+      ansible.builtin.command: npm run import
+      args:
+        chdir: "{{ project_root }}/backend"
+      when:
+        - node_role == "backend"
+        - not backend_import_marker.stat.exists
+
+    - name: Create backend import marker
+      ansible.builtin.file:
+        path: /var/lib/chmurowe/backend_import_done
+        state: touch
+        mode: "0644"
+      when:
+        - node_role == "backend"
+        - not backend_import_marker.stat.exists
+
+    - name: Configure backend systemd unit
+      ansible.builtin.template:
+        src: templates/chmurowe-backend.service.j2
+        dest: /etc/systemd/system/chmurowe-backend.service
+        mode: "0644"
+      when: node_role == "backend"
+      notify: restart backend service
+
+    - name: Ensure backend API service is enabled and started
+      ansible.builtin.systemd:
+        name: chmurowe-backend
+        daemon_reload: true
+        enabled: true
+        state: started
+      when: node_role == "backend"
+
+    - name: Create frontend .env
+      ansible.builtin.copy:
+        dest: "{{ project_root }}/frontend/.env"
+        mode: "0644"
+        content: |
+          VITE_API_URL=http://{{ backend_host }}:8080
+      when: node_role == "frontend"
+
+    - name: Install frontend dependencies
+      ansible.builtin.command: npm install
+      args:
+        chdir: "{{ project_root }}/frontend"
+      when: node_role == "frontend"
+
+    - name: Build frontend bundle
+      ansible.builtin.command: npm run build
+      args:
+        chdir: "{{ project_root }}/frontend"
+      when: node_role == "frontend"
+
+    - name: Install nginx
+      ansible.builtin.apt:
+        name: nginx
+        state: present
+      when: node_role == "frontend"
+
+    - name: Configure nginx site for frontend
+      ansible.builtin.template:
+        src: templates/chmurowe-frontend.conf.j2
+        dest: /etc/nginx/sites-available/chmurowe-frontend.conf
+        mode: "0644"
+      when: node_role == "frontend"
+      notify: restart nginx
+
+    - name: Disable default nginx site
+      ansible.builtin.file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+      when: node_role == "frontend"
+      notify: restart nginx
+
+    - name: Enable frontend nginx site
+      ansible.builtin.file:
+        src: /etc/nginx/sites-available/chmurowe-frontend.conf
+        dest: /etc/nginx/sites-enabled/chmurowe-frontend.conf
+        state: link
+      when: node_role == "frontend"
+      notify: restart nginx
+
+    - name: Ensure nginx is enabled and started
+      ansible.builtin.service:
+        name: nginx
+        enabled: true
+        state: started
+      when: node_role == "frontend"

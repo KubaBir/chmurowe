@@ -1,0 +1,17 @@
+[Unit]
+Description=Chmurowe Backend API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=vagrant
+Group=vagrant
+WorkingDirectory=/vagrant/backend
+Environment=NODE_ENV=production
+ExecStart=/usr/bin/node src/index.js
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
