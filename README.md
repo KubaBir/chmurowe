@@ -77,3 +77,60 @@ cd frontend && npm run build
 ```
 
 Statyczne pliki w `frontend/dist/` — do hostowania za reverse proxy lub CDN; backend uruchamiaj przez `npm start` w `backend/` z ustawionym `DATABASE_URL`.
+
+## Kubernetes (kind)
+
+Wymagania: [kind](https://kind.sigs.k8s.io/), [kubectl](https://kubernetes.io/docs/tasks/tools/), Docker.
+
+### Uruchomienie
+
+```bash
+# 1. Utwórz lokalny klaster (mapuje porty 30000→8080 i 30001→3000)
+kind create cluster --config=kind-cluster.yaml
+
+# 2. Zbuduj obrazy
+docker build -t spotify-backend ./backend
+docker build -t spotify-frontend ./frontend
+
+# 3. Załaduj obrazy do klastra
+kind load docker-image spotify-backend
+kind load docker-image spotify-frontend
+
+# 4. Utwórz ConfigMap ze schematu bazy (czyta db/schema.sql)
+kubectl create configmap db-init-config --from-file=01-schema.sql=./db/schema.sql
+
+# 5. Aplikuj manifesty (kolejność ważna)
+kubectl apply -f k8s/db.yaml
+kubectl wait --for=condition=ready pod/db-pod --timeout=120s
+
+# 6. Aplikuj backend i frontend
+kubectl apply -f k8s/backend.yaml
+kubectl apply -f k8s/frontend.yaml
+```
+
+Po uruchomieniu:
+
+- UI: `http://localhost:8080`
+- API: `http://localhost:3000`
+
+### Diagnostyka
+
+```bash
+kubectl get pods              # status wszystkich podów
+kubectl get services          # lista serwisów i portów
+kubectl logs backend-pod      # logi backendu
+kubectl describe pod db-pod   # szczegóły + eventy poda
+```
+
+### Usunięcie klastra
+
+```bash
+kind delete cluster
+```
+
+### Struktura manifestów
+
+- [`kind-cluster.yaml`](kind-cluster.yaml) — konfiguracja klastra kind
+- [`k8s/db.yaml`](k8s/db.yaml) — ConfigMap, PersistentVolume, PersistentVolumeClaim, Pod i Service bazy danych
+- [`k8s/backend.yaml`](k8s/backend.yaml) — Pod i Service backendu (NodePort 30001)
+- [`k8s/frontend.yaml`](k8s/frontend.yaml) — Pod i Service frontendu (NodePort 30000)
