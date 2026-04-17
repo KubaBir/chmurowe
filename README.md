@@ -4,28 +4,28 @@ Monorepo na potrzeby zajęć: baza **PostgreSQL**, backend **Express** (REST), f
 
 ## Wymagania
 
-- [Docker](https://www.docker.com/) (PostgreSQL w kontenerze)
-- Node.js 20+ i npm
+-   [Docker](https://www.docker.com/) (PostgreSQL w kontenerze)
+-   Node.js 20+ i npm
 
 ## Konfiguracja
 
 1. Uruchom bazę:
 
-   ```bash
-   docker compose up -d
-   ```
+    ```bash
+    docker compose up -d
+    ```
 
 2. Backend — skopiuj [`backend/.env.example`](backend/.env.example) do `backend/.env` (domyślnie pasuje do `docker-compose.yml`).
 
 3. Zaimportuj CSV z folderu [`archive/`](archive/):
 
-   ```bash
-   cd backend
-   npm install
-   npm run import
-   ```
+    ```bash
+    cd backend
+    npm install
+    npm run import
+    ```
 
-   Oczekiwany wynik: **150** utworów (100 all-time + 50 Wrapped 2025) i **50** artystów. Import odtwarza schemat (`db/schema.sql`) — **nadpisuje** istniejące tabele.
+    Oczekiwany wynik: **150** utworów (100 all-time + 50 Wrapped 2025) i **50** artystów. Import odtwarza schemat (`db/schema.sql`) — **nadpisuje** istniejące tabele.
 
 4. Frontend — skopiuj [`frontend/.env.example`](frontend/.env.example) do `frontend/.env` (adres API).
 
@@ -41,8 +41,8 @@ cd backend && npm run dev
 cd frontend && npm run dev
 ```
 
-- API: `http://localhost:3000`
-- UI: adres z Vite (np. `http://localhost:5173`)
+-   API: `http://localhost:3000`
+-   UI: adres z Vite (np. `http://localhost:5173`)
 
 Opcjonalnie z katalogu głównego (wymaga `npm install` w root):
 
@@ -53,22 +53,22 @@ npm run dev
 
 ## API (skrót)
 
-| Metoda | Ścieżka | Opis |
-|--------|---------|------|
-| `GET` | `/songs` | Wszystkie utwory |
-| `GET` | `/songs?primary_genre=...` | Filtr po gatunku (jeden parametr) |
-| `GET` | `/songs?artist=...` | Filtr po artyście (jeden parametr) |
-| `POST` | `/songs` | Dodanie utworu (JSON) |
-| `PUT` | `/songs/:id` | Aktualizacja utworu |
-| `GET` | `/stats/popular-genres?limit=20` | Najpopularniejsze gatunki (suma streamów) |
-| `GET` | `/artists` | Lista artystów (Wrapped 2025) |
+| Metoda | Ścieżka                          | Opis                                      |
+| ------ | -------------------------------- | ----------------------------------------- |
+| `GET`  | `/songs`                         | Wszystkie utwory                          |
+| `GET`  | `/songs?primary_genre=...`       | Filtr po gatunku (jeden parametr)         |
+| `GET`  | `/songs?artist=...`              | Filtr po artyście (jeden parametr)        |
+| `POST` | `/songs`                         | Dodanie utworu (JSON)                     |
+| `PUT`  | `/songs/:id`                     | Aktualizacja utworu                       |
+| `GET`  | `/stats/popular-genres?limit=20` | Najpopularniejsze gatunki (suma streamów) |
+| `GET`  | `/artists`                       | Lista artystów (Wrapped 2025)             |
 
 ## Struktura
 
-- [`db/schema.sql`](db/schema.sql) — definicja tabel `songs`, `artists`
-- [`backend/`](backend/) — Express, skrypt importu `scripts/import.mjs`
-- [`frontend/`](frontend/) — Vite + React + Tailwind
-- [`archive/`](archive/) — źródłowe pliki CSV (Kaggle)
+-   [`db/schema.sql`](db/schema.sql) — definicja tabel `songs`, `artists`
+-   [`backend/`](backend/) — Express, skrypt importu `scripts/import.mjs`
+-   [`frontend/`](frontend/) — Vite + React + Tailwind
+-   [`archive/`](archive/) — źródłowe pliki CSV (Kaggle)
 
 ## Produkcja
 
@@ -87,14 +87,22 @@ docker compose -f docker-compose.prod.yml up -d --build
 docker compose -f docker-compose.prod.yml run --rm backend-service npm run import
 ```
 
-- UI i API przez jeden port hosta: `http://localhost` (nginx w kontenerze `frontend` serwuje UI i proxy `/api` → backend).
-- Przykład: `http://localhost/api/songs`
+-   UI i API przez jeden port hosta: `http://localhost` (nginx w kontenerze `frontend` serwuje UI i proxy `/api` → backend).
+-   Przykład: `http://localhost/api/songs`
 
 ## Google Cloud (Etap 5 — VM, Terraform, Ansible, GKE)
 
 Wymagania narzędziowe: [gcloud CLI](https://cloud.google.com/sdk/gcloud), [Terraform](https://www.terraform.io/), [Ansible](https://docs.ansible.com/), `kubectl`. W projekcie GCP włącz m.in. **Compute Engine**, **Kubernetes Engine**, **Artifact Registry** (dla obrazów GKE).
 
 ### 1. Terraform — maszyna wirtualna
+
+Start istniejącej maszyny
+
+```bash
+gcloud compute instances start chmurowe-app \
+  --zone=europe-west1-b \
+  --project=chmurowe-493610
+```
 
 ```bash
 cd infra/terraform/gcp
@@ -125,26 +133,46 @@ Weryfikacja: w przeglądarce `http://INSTANCE_IP/` (UI) oraz `http://INSTANCE_IP
 
 1. Utwórz repozytorium w Artifact Registry (np. `chmurowe`) i [skonfiguruj Docker](https://cloud.google.com/artifact-registry/docs/docker/authentication):
 
-   ```bash
-   gcloud auth configure-docker REGION-docker.pkg.dev
-   ```
+    ```bash
+    gcloud auth configure-docker REGION-docker.pkg.dev
+    ```
 
 2. Zbuduj i wypchnij obrazy (**kontekst = root repozytorium**):
 
-   ```bash
-   export REGION=europe-west1
-   export PROJECT_ID=$(gcloud config get-value project)
-   docker build -f backend/Dockerfile -t ${REGION}-docker.pkg.dev/${PROJECT_ID}/chmurowe/backend:latest .
-   docker build -f frontend/Dockerfile -t ${REGION}-docker.pkg.dev/${PROJECT_ID}/chmurowe/frontend:latest .
-   docker push ${REGION}-docker.pkg.dev/${PROJECT_ID}/chmurowe/backend:latest
-   docker push ${REGION}-docker.pkg.dev/${PROJECT_ID}/chmurowe/frontend:latest
-   ```
+    ```bash
+    export REGION=europe-west1
+    export PROJECT_ID=$(gcloud config get-value project)
+    docker build -f backend/Dockerfile -t ${REGION}-docker.pkg.dev/${PROJECT_ID}/chmurowe/backend:latest .
+    docker build -f frontend/Dockerfile -t ${REGION}-docker.pkg.dev/${PROJECT_ID}/chmurowe/frontend:latest .
+    docker push ${REGION}-docker.pkg.dev/${PROJECT_ID}/chmurowe/backend:latest
+    docker push ${REGION}-docker.pkg.dev/${PROJECT_ID}/chmurowe/frontend:latest
+    ```
 
-3. Utwórz klaster GKE (konsola lub `gcloud container clusters create ...`), potem:
+3. Utwórz klaster GKE (konsola lub `gcloud container clusters create ...`),
 
-   ```bash
-   gcloud container clusters get-credentials NAZWA_KLASTRA --region=REGION
-   ```
+    ````bash
+    gcloud container clusters create chmurowe-gke \
+    --zone=europe-west1-b \
+    --num-nodes=1 \
+    --machine-type=e2-small \
+    --disk-size=30 \
+    --disk-type=pd-standard \
+    --release-channel=regular \
+    --enable-ip-alias \
+    --project=chmurowe-493610
+    ```
+    ````
+
+potem
+
+```bash
+gcloud container clusters get-credentials chmurowe-gke --region=europe-west1-b
+```
+
+```bash
+kubectl apply -f k8s/gke/secrets.yaml
+kubectl get secret chmurowe-secrets
+```
 
 4. Skopiuj [`k8s/gke/secrets.yaml.example`](k8s/gke/secrets.yaml.example) do `k8s/gke/secrets.yaml`, ustaw hasło i spójny `database-url`, potem `kubectl apply -f k8s/gke/secrets.yaml`.
 
@@ -152,11 +180,11 @@ Weryfikacja: w przeglądarce `http://INSTANCE_IP/` (UI) oraz `http://INSTANCE_IP
 
 6. Zastosuj manifesty:
 
-   ```bash
-   kubectl apply -k k8s/gke/
-   ```
+    ```bash
+    kubectl apply -k k8s/gke/
+    ```
 
-7. Poczekaj na adres Ingress (`kubectl get ingress chmurowe-ingress` — kolumna `ADDRESS`). Otwórz `http://ADRES/` oraz sprawdź `http://ADRES/api/songs`.
+7. Poczekaj na adres Ingress (`kubectl get svc frontend-service -w` — kolumna `ADDRESS`). Otwórz `http://ADRES/` oraz sprawdź `http://ADRES/api/songs`.
 
 8. Import danych uruchamia **Job** `chmurowe-import`. Status: `kubectl logs job/chmurowe-import`. Ponowny import: `kubectl delete job chmurowe-import` i ponownie `kubectl apply -f k8s/gke/import-job.yaml`.
 
@@ -196,9 +224,9 @@ kubectl apply -f k8s/frontend.yaml
 
 Po uruchomieniu:
 
-- UI: `http://localhost:8080`
-- API przez nginx frontendu: `http://localhost:8080/api/...` (np. `/api/songs`)
-- Bezpośrednio na backend (NodePort): `http://localhost:3000`
+-   UI: `http://localhost:8080`
+-   API przez nginx frontendu: `http://localhost:8080/api/...` (np. `/api/songs`)
+-   Bezpośrednio na backend (NodePort): `http://localhost:3000`
 
 ### Diagnostyka
 
@@ -217,8 +245,8 @@ kind delete cluster
 
 ### Struktura manifestów
 
-- [`kind-cluster.yaml`](kind-cluster.yaml) — konfiguracja klastra kind
-- [`k8s/db.yaml`](k8s/db.yaml) — ConfigMap, PersistentVolume, PersistentVolumeClaim, Pod i Service bazy danych
-- [`k8s/backend.yaml`](k8s/backend.yaml) — Pod i Service backendu (NodePort 30001)
-- [`k8s/frontend.yaml`](k8s/frontend.yaml) — Pod i Service frontendu (NodePort 30000)
-- [`k8s/gke/`](k8s/gke/) — wariant pod **GKE** (PVC bez `hostPath`, Ingress, Secret, Job importu)
+-   [`kind-cluster.yaml`](kind-cluster.yaml) — konfiguracja klastra kind
+-   [`k8s/db.yaml`](k8s/db.yaml) — ConfigMap, PersistentVolume, PersistentVolumeClaim, Pod i Service bazy danych
+-   [`k8s/backend.yaml`](k8s/backend.yaml) — Pod i Service backendu (NodePort 30001)
+-   [`k8s/frontend.yaml`](k8s/frontend.yaml) — Pod i Service frontendu (NodePort 30000)
+-   [`k8s/gke/`](k8s/gke/) — wariant pod **GKE** (PVC bez `hostPath`, Ingress, Secret, Job importu)

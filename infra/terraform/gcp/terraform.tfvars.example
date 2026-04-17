@@ -1,4 +1,4 @@
-project_id   = "your-gcp-project-id"
+project_id   = "chmurowe-493610"
 region       = "europe-west1"
 zone         = "europe-west1-b"
 machine_type = "e2-micro"

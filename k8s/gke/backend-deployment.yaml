@@ -14,8 +14,7 @@ spec:
     spec:
       containers:
         - name: backend
-          # Replace with: REGION-docker.pkg.dev/PROJECT_ID/REPO_NAME/backend:TAG
-          image: europe-west1-docker.pkg.dev/PROJECT_ID/chmurowe/backend:latest
+          image: europe-west1-docker.pkg.dev/chmurowe-493610/chmurowe/backend:latest
           imagePullPolicy: Always
           env:
             - name: DATABASE_URL

@@ -14,9 +14,8 @@ spec:
     spec:
       containers:
         - name: frontend
-          # Replace with: REGION-docker.pkg.dev/PROJECT_ID/REPO_NAME/frontend:TAG
-          # Build with: docker build --build-arg VITE_API_URL=/api -f frontend/Dockerfile -t ... .
-          image: europe-west1-docker.pkg.dev/PROJECT_ID/chmurowe/frontend:latest
+          # Build: docker build --build-arg VITE_API_URL=/api -f frontend/Dockerfile -t ... .
+          image: europe-west1-docker.pkg.dev/chmurowe-493610/chmurowe/frontend:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 80
@@ -34,7 +33,7 @@ kind: Service
 metadata:
   name: frontend-service
 spec:
-  type: ClusterIP
+  type: LoadBalancer
   selector:
     app: frontend
   ports:

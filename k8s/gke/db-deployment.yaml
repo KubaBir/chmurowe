@@ -25,6 +25,9 @@ spec:
                   key: postgres-password
             - name: POSTGRES_DB
               value: spotify_db
+            # Subdir avoids initdb failure when the volume root has lost+found (GCE PD).
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
           ports:
             - containerPort: 5432
           volumeMounts:
