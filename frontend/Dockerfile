@@ -2,15 +2,20 @@ FROM node:20-alpine AS builder
 
 WORKDIR /build
 
-COPY package*.json ./
+COPY frontend/package*.json ./
 
 RUN npm ci
 
-COPY . .
+COPY frontend/ ./
+
+ARG VITE_API_URL=/api
+ENV VITE_API_URL=$VITE_API_URL
 
 RUN npm run build
 
 FROM nginx:1.27-alpine
+
+COPY frontend/nginx.default.conf /etc/nginx/conf.d/default.conf
 
 COPY --from=builder /build/dist /usr/share/nginx/html
 

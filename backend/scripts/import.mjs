@@ -8,7 +8,8 @@ import dotenv from "dotenv";
 dotenv.config({ path: path.join(path.dirname(fileURLToPath(import.meta.url)), "../.env") });
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const projectRoot = path.resolve(__dirname, "../..");
+const projectRoot =
+  process.env.DATA_ROOT || path.resolve(__dirname, "../..");
 
 function loadCsv(filePath) {
   const raw = fs.readFileSync(filePath, "utf8");

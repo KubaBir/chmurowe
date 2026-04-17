@@ -3,3 +3,17 @@ node_modules/
 dist/
 *.log
 .DS_Store
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.lock.hcl
+*.tfvars
+!*.tfvars.example
+
+# Ansible
+infra/ansible/inventory.ini
+
+# GKE secrets (generated from secrets.yaml.example)
+k8s/gke/secrets.yaml

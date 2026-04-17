@@ -1,0 +1,59 @@
+---
+- name: Deploy chmurowe on GCE (Docker Compose production stack)
+  hosts: app
+  become: true
+
+  tasks:
+    - name: Install Docker and Compose (Ubuntu packages)
+      ansible.builtin.apt:
+        name:
+          - docker.io
+          - docker-compose-v2
+          - git
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Ensure Docker service is running
+      ansible.builtin.service:
+        name: docker
+        state: started
+        enabled: true
+
+    - name: Clone or update application repository
+      ansible.builtin.git:
+        repo: "{{ chmurowe_repo_url }}"
+        dest: "{{ chmurowe_deploy_dir }}"
+        version: "{{ chmurowe_repo_version }}"
+        force: true
+
+    - name: Build and start containers
+      ansible.builtin.command:
+        argv:
+          - docker
+          - compose
+          - -f
+          - docker-compose.prod.yml
+          - up
+          - -d
+          - --build
+        chdir: "{{ chmurowe_deploy_dir }}"
+
+    - name: Wait for Postgres to accept connections
+      ansible.builtin.pause:
+        seconds: 10
+
+    - name: Import CSV data into Postgres (idempotent reset per import script)
+      ansible.builtin.command:
+        argv:
+          - docker
+          - compose
+          - -f
+          - docker-compose.prod.yml
+          - run
+          - --rm
+          - backend-service
+          - npm
+          - run
+          - import
+        chdir: "{{ chmurowe_deploy_dir }}"

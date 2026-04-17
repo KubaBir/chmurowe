@@ -1,0 +1,39 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: chmurowe-import
+spec:
+  backoffLimit: 4
+  template:
+    spec:
+      restartPolicy: Never
+      initContainers:
+        - name: wait-for-postgres
+          image: postgres:16-alpine
+          command:
+            - sh
+            - -c
+            - |
+              until pg_isready -h db-service -U spotify -d spotify_db; do
+                echo waiting for db; sleep 3;
+              done
+          env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: chmurowe-secrets
+                  key: postgres-password
+      containers:
+        - name: import
+          # Must match backend image in backend-deployment.yaml
+          image: europe-west1-docker.pkg.dev/PROJECT_ID/chmurowe/backend:latest
+          imagePullPolicy: Always
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: chmurowe-secrets
+                  key: database-url
+            - name: DATA_ROOT
+              value: "/app"
+          command: ["npm", "run", "import"]

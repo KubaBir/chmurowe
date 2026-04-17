@@ -1,0 +1,6 @@
+project_id   = "your-gcp-project-id"
+region       = "europe-west1"
+zone         = "europe-west1-b"
+machine_type = "e2-micro"
+# Restrict SSH to your IP when possible:
+ssh_cidr = "0.0.0.0/0"

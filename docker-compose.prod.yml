@@ -1,0 +1,42 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: spotify
+      POSTGRES_PASSWORD: spotify
+      POSTGRES_DB: spotify_db
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U spotify -d spotify_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend-service:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      DATABASE_URL: postgresql://spotify:spotify@postgres:5432/spotify_db
+      PORT: "8080"
+      DATA_ROOT: /app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    expose:
+      - "8080"
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      args:
+        VITE_API_URL: /api
+    ports:
+      - "80:80"
+    depends_on:
+      - backend-service
+
+volumes:
+  pgdata:

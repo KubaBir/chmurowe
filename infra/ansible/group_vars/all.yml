@@ -1,0 +1,5 @@
+---
+# Override in extra-vars or edit before running playbooks.
+chmurowe_repo_url: "https://github.com/REPLACE_WITH_YOUR_FORK/chmurowe.git"
+chmurowe_repo_version: "main"
+chmurowe_deploy_dir: "/opt/chmurowe"

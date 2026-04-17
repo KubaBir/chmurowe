@@ -1,0 +1,12 @@
+; Copy to inventory.ini (gitignored) and set the host IP from:
+;   cd ../terraform/gcp && terraform output -raw instance_external_ip
+;
+; After first deploy, use the OS Login user from gcloud, e.g.:
+;   gcloud compute ssh chmurowe-app --zone=europe-west1-b --dry-run
+; Typical user is your Google username or the account from `gcloud config get-value account` with dots replaced.
+;
+; For the default Compute Engine SSH key (before OS Login), use:
+;   ansible_user=YOUR_LINUX_USER ansible_ssh_private_key_file=~/.ssh/google_compute_engine
+
+[app]
+CHMUROWE_VM_IP ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/google_compute_engine

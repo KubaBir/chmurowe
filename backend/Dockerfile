@@ -1,15 +1,18 @@
 FROM node:20-slim
 
 ENV NODE_ENV=production \
-    PORT=8080
+    PORT=8080 \
+    DATA_ROOT=/app
 
 WORKDIR /app
 
-COPY package*.json ./
+COPY backend/package*.json ./
 
-RUN npm ci --only=production
+RUN npm ci --omit=dev
 
-COPY . .
+COPY backend/ ./
+COPY db ./db
+COPY archive ./archive
 
 EXPOSE 8080
 
