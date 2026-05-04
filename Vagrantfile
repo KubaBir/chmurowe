@@ -1,11 +1,12 @@
 Vagrant.configure("2") do |config|
   config.vm.box = "ubuntu/jammy64"
-  config.vm.boot_timeout = 600
+  config.vm.boot_timeout = 900
 
   configure_ansible = lambda do |machine, role|
     machine.vm.provision "ansible_local" do |ansible|
       ansible.playbook = "/vagrant/ansible/playbook.yml"
       ansible.install = true
+      ansible.install_mode = "pip"
       ansible.extra_vars = {
         node_role: role,
         db_host: "192.168.56.10",
@@ -31,8 +32,8 @@ Vagrant.configure("2") do |config|
     backend.vm.network "private_network", ip: "192.168.56.11"
 
     backend.vm.provider "virtualbox" do |vb|
-      vb.memory = 1536
-      vb.cpus = 2
+      vb.memory = 2048
+      vb.cpus = 3
     end
 
     configure_ansible.call(backend, "backend")

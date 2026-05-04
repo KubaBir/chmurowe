@@ -190,7 +190,7 @@
         dest: "{{ project_root }}/frontend/.env"
         mode: "0644"
         content: |
-          VITE_API_URL=http://{{ backend_host }}:8080
+          VITE_API_URL=http://localhost:8080
       when: node_role == "frontend"
 
     - name: Install frontend dependencies
