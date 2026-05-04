@@ -8,7 +8,13 @@ import dotenv from "dotenv";
 dotenv.config({ path: path.join(path.dirname(fileURLToPath(import.meta.url)), "../.env") });
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const projectRoot = path.resolve(__dirname, "../..");
+
+function resolveExistingPath(candidates) {
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) return candidate;
+  }
+  throw new Error(`None of the expected paths exist: ${candidates.join(", ")}`);
+}
 
 function loadCsv(filePath) {
   const raw = fs.readFileSync(filePath, "utf8");
@@ -42,12 +48,21 @@ async function main() {
   const client = new pg.Client({ connectionString: databaseUrl });
   await client.connect();
 
-  const schemaSql = fs.readFileSync(path.join(projectRoot, "db/schema.sql"), "utf8");
+  const schemaPath = resolveExistingPath([
+    path.resolve(__dirname, "../db/schema.sql"),
+    path.resolve(__dirname, "../../db/schema.sql"),
+  ]);
+  const schemaSql = fs.readFileSync(schemaPath, "utf8");
   await client.query(schemaSql);
 
-  const alltimePath = path.join(projectRoot, "archive/spotify_alltime_top100_songs.csv");
-  const wrappedSongsPath = path.join(projectRoot, "archive/spotify_wrapped_2025_top50_songs.csv");
-  const artistsPath = path.join(projectRoot, "archive/spotify_wrapped_2025_top50_artists.csv");
+  const archiveDir = resolveExistingPath([
+    path.resolve(__dirname, "../archive"),
+    path.resolve(__dirname, "../../archive"),
+  ]);
+
+  const alltimePath = path.join(archiveDir, "spotify_alltime_top100_songs.csv");
+  const wrappedSongsPath = path.join(archiveDir, "spotify_wrapped_2025_top50_songs.csv");
+  const artistsPath = path.join(archiveDir, "spotify_wrapped_2025_top50_artists.csv");
 
   const alltimeRows = loadCsv(alltimePath);
   for (const row of alltimeRows) {
